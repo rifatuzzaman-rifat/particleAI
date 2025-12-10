@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universe v8.0 | Nebula Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
+    <style>
+        /* --- CORE VISUALS --- */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #000;
+            font-family: 'Rajdhani', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
+            background: radial-gradient(circle at center, #0b0b15 0%, #000 100%);
+        }
+
+        /* --- UI LAYER --- */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        /* TOP BAR */
+        .top-bar {
+            padding: 20px; display: flex; justify-content: space-between; align-items: flex-start;
+            pointer-events: auto;
+        }
+        
+        .title-block h1 {
+            font-family: 'Orbitron', sans-serif; color: #fff; margin: 0; font-size: 24px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5); letter-spacing: 2px;
+        }
+        .title-block span { color: #00e5ff; font-size: 12px; font-weight: bold; }
+
+        /* BUTTONS */
+        .btn {
+            background: rgba(0, 20, 30, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            color: #0ff; padding: 10px 20px; border-radius: 4px;
+            cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 12px;
+            backdrop-filter: blur(4px); transition: all 0.3s ease;
+            text-transform: uppercase; pointer-events: auto;
+        }
+        .btn:hover { background: rgba(0, 255, 255, 0.2); box-shadow: 0 0 15px rgba(0, 255, 255, 0.4); }
+
+        /* VIDEO PREVIEW */
+        #input_video {
+            width: 120px; height: 90px; border-radius: 8px;
+            border: 1px solid #0ff; background: #000; opacity: 0.8;
+            transform: scaleX(-1); box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+        .video-wrapper { position: relative; pointer-events: auto; }
+        .cam-badge {
+            position: absolute; bottom: 5px; right: 5px;
+            background: red; width: 8px; height: 8px; border-radius: 50%;
+            box-shadow: 0 0 5px red; animation: pulse 1s infinite;
+        }
+
+        /* BOTTOM DOCK */
+        .dock-container {
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            padding: 20px 0; width: 100%; display: flex; flex-direction: column; align-items: center;
+            pointer-events: auto;
+        }
+        .status-text {
+            color: #0ff; font-family: monospace; font-size: 12px; margin-bottom: 10px;
+            text-shadow: 0 0 5px #0ff; letter-spacing: 1px;
+        }
+        .shape-dock {
+            display: flex; gap: 10px; overflow-x: auto; padding: 10px 20px; max-width: 95%;
+            scrollbar-width: none; mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+        }
+        .shape-dock::-webkit-scrollbar { display: none; }
+        
+        .dock-btn {
+            background: transparent; border: 1px solid #333; color: #666;
+            padding: 10px 15px; min-width: 80px; border-radius: 20px;
+            font-size: 11px; font-weight: 700; transition: 0.3s; cursor: pointer;
+            font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .dock-btn:hover { border-color: #0ff; color: #fff; }
+        .dock-btn.active {
+            background: #00e5ff; color: #000; border-color: #00e5ff;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+        }
+
+        /* --- MANUAL OVERLAY (The Manuel) --- */
+        #manual-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+        }
+        #manual-overlay.visible { opacity: 1; pointer-events: auto; }
+        
+        .manual-card {
+            background: rgba(0, 20, 30, 0.9); border: 1px solid #00e5ff;
+            padding: 40px; border-radius: 12px; max-width: 500px; width: 90%;
+            box-shadow: 0 0 50px rgba(0, 229, 255, 0.15); text-align: center;
+            position: relative;
+        }
+        .manual-card h2 { color: #fff; font-family: 'Orbitron'; margin-top: 0; text-transform: uppercase; }
+        .grid-guide {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 30px 0;
+            text-align: left;
+        }
+        .guide-item { color: #aaa; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .guide-icon {
+            width: 40px; height: 40px; border-radius: 50%; background: #003344; color: #0ff;
+            display: flex; justify-content: center; align-items: center; font-size: 18px;
+            border: 1px solid #0ff; box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+        .close-btn {
+            position: absolute; top: 15px; right: 20px; color: #555; font-size: 24px; cursor: pointer;
+        }
+        .close-btn:hover { color: #fff; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        
+        /* ERROR LOG */
+        #error-log { position: absolute; bottom: 10px; left: 10px; color: red; font-size: 10px; z-index: 200; display:none; }
+    </style>
+</head>
+<body>
+
+    <div id="error-log"></div>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="top-bar">
+            <div class="title-block">
+                <h1>NEBULA</h1>
+                <span>SYSTEM V8.0</span>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button class="btn" onclick="toggleManual()">Manual</button>
+                <div class="video-wrapper">
+                    <video id="input_video" playsinline autoplay muted></video>
+                    <div class="cam-badge"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dock-container">
+            <div id="status">SYSTEM INITIALIZING...</div>
+            <div class="shape-dock">
+                <button onclick="setShape('galaxy')" class="dock-btn active" id="btn-galaxy">Galaxy</button>
+                <button onclick="setShape('atom')" class="dock-btn" id="btn-atom">Atom</button>
+                <button onclick="setShape('nebula')" class="dock-btn" id="btn-nebula">Nebula</button>
+                <button onclick="setShape('saturn')" class="dock-btn" id="btn-saturn">Saturn</button>
+                <button onclick="setShape('helix')" class="dock-btn" id="btn-helix">Double Helix</button>
+                <button onclick="setShape('hypercube')" class="dock-btn" id="btn-hypercube">Hypercube</button>
+                <button onclick="setShape('vortex')" class="dock-btn" id="btn-vortex">Vortex</button>
+                <button onclick="setShape('sphere')" class="dock-btn" id="btn-sphere">Sphere</button>
+                <button onclick="setShape('bigbang')" class="dock-btn" id="btn-bigbang">Big Bang</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="manual-overlay" class="visible">
+        <div class="manual-card">
+            <div class="close-btn" onclick="toggleManual()">×</div>
+            <h2>System Controls</h2>
+            <p style="color:#0ff; margin-bottom: 20px;">Use your Camera or Mouse to manipulate the particles.</p>
+            
+            <div class="grid-guide">
+                <div class="guide-item">
+                    <div class="guide-icon">🖐</div>
+                    <div>
+                        <strong style="color:#fff">OPEN HAND</strong><br>
+                        Rotate the universe. Move hand left/right/up/down.
+                    </div>
+                </div>
+                <div class="guide-item">
+                    <div class="guide-icon">🤏</div>
+                    <div>
+                        <strong style="color:#fff">PINCH</strong><br>
+                        Collapse particles into a Black Hole singularity.
+                    </div>
+                </div>
+                <div class="guide-item">
+                    <div class="guide-icon">🖱</div>
+                    <div>
+                        <strong style="color:#fff">MOUSE DRAG</strong><br>
+                        Rotate view (if camera is off or not detected).
+                    </div>
+                </div>
+                <div class="guide-item">
+                    <div class="guide-icon">🔍</div>
+                    <div>
+                        <strong style="color:#fff">SCROLL</strong><br>
+                        Zoom in and out of the nebula.
+                    </div>
+                </div>
+            </div>
+            <button class="btn" style="width:100%; font-size:14px; padding:15px;" onclick="toggleManual()">INITIALIZE SYSTEM</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.0/examples/jsm/",
+                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+        // --- GLOBAL STATE ---
+        const IS_MOBILE = window.innerWidth < 768;
+        const PARTICLE_COUNT = IS_MOBILE ? 8000 : 25000;
+        
+        let scene, camera, renderer, composer, controls;
+        let mainSystem, pointsGeometry, pointsMaterial;
+        let targetPositions, originalColors, currentColors;
+        let time = 0;
+        let currentShape = 'galaxy';
+        
+        // Input State
+        let handState = { x: 0, y: 0, pinch: 0, active: false };
+        let mouseState = { x: 0, y: 0, active: false };
+
+        // --- INIT ---
+        function init() {
+            // Scene Setup
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100);
+            camera.position.z = 15;
+
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); // Antialias off for post-proc performance
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Post Processing (BLOOM)
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0;
+            bloomPass.strength = IS_MOBILE ? 0.8 : 1.5; // Less bloom on mobile
+            bloomPass.radius = 0.5;
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // Controls (Fallback)
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+
+            // Initialize Particles
+            createParticles();
+            generateShape('galaxy'); // Start shape
+            
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            
+            // Start Loop
+            animate();
+            
+            // Init AI
+            initComputerVision();
+        }
+
+        function createParticles() {
+            pointsGeometry = new THREE.BufferGeometry();
+            targetPositions = new Float32Array(PARTICLE_COUNT * 3);
+            const positions = new Float32Array(PARTICLE_COUNT * 3);
+            const colors = new Float32Array(PARTICLE_COUNT * 3);
+            const sizes = new Float32Array(PARTICLE_COUNT);
+
+            const color = new THREE.Color();
+
+            for(let i=0; i<PARTICLE_COUNT; i++) {
+                positions[i*3] = (Math.random()-0.5)*50;
+                positions[i*3+1] = (Math.random()-0.5)*50;
+                positions[i*3+2] = (Math.random()-0.5)*50;
+                
+                targetPositions[i*3] = 0;
+                targetPositions[i*3+1] = 0;
+                targetPositions[i*3+2] = 0;
+
+                color.setHSL(Math.random(), 0.7, 0.5);
+                colors[i*3] = color.r;
+                colors[i*3+1] = color.g;
+                colors[i*3+2] = color.b;
+
+                sizes[i] = Math.random();
+            }
+
+            pointsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            pointsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            pointsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+            // Custom Shader Material for prettier points
+            const sprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png');
+            pointsMaterial = new THREE.PointsMaterial({
+                size: IS_MOBILE ? 0.15 : 0.1,
+                map: sprite,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            mainSystem = new THREE.Points(pointsGeometry, pointsMaterial);
+            scene.add(mainSystem);
+            
+            originalColors = Float32Array.from(colors);
+            currentColors = colors;
+        }
+
+        // --- SHAPE GENERATOR ---
+        function generateShape(type) {
+            currentShape = type;
+            const pos = targetPositions;
+            const colors = pointsGeometry.attributes.color.array;
+            const c = new THREE.Color();
+
+            // Reset controls on shape change for dramatic effect
+            controls.autoRotateSpeed = 0.5;
+
+            for(let i=0; i<PARTICLE_COUNT; i++) {
+                const i3 = i*3;
+                let x=0, y=0, z=0;
+
+                if (type === 'galaxy') {
+                    const arms = 3;
+                    const r = Math.pow(Math.random(), 0.7) * 8;
+                    const angle = (r * 2) + ((i % arms)/arms) * Math.PI * 2;
+                    const spread = 0.5; // Random spread
+                    x = Math.cos(angle) * r + (Math.random()-0.5)*spread;
+                    z = Math.sin(angle) * r + (Math.random()-0.5)*spread;
+                    y = (Math.random()-0.5) * Math.exp(-r*0.3) * 3;
+                    c.setHSL(0.6 + r/20, 0.9, 0.6);
+
+                } else if (type === 'nebula') {
+                    // Cloud-like Perlin noise approx
+                    x = (Math.random()-0.5) * 15;
+                    y = (Math.random()-0.5) * 15;
+                    z = (Math.random()-0.5) * 15;
+                    // Clamp to sphere but fuzzy
+                    const d = Math.sqrt(x*x+y*y+z*z);
+                    if(d > 8) { x*=0.5; y*=0.5; z*=0.5; }
+                    c.setHSL(Math.random()*0.2 + 0.5, 0.8, 0.6); // Blues and Purples
+
+                } else if (type === 'atom') {
+                    // Nucleus
+                    if (i < PARTICLE_COUNT * 0.15) {
+                        x=(Math.random()-0.5)*1.5; y=(Math.random()-0.5)*1.5; z=(Math.random()-0.5)*1.5;
+                        c.setHex(0xff5500);
+                    } else {
+                        // Electrons
+                        const ring = i % 3;
+                        const ang = Math.random() * Math.PI * 2;
+                        const r = 6 + Math.random();
+                        let tx = Math.cos(ang)*r; let ty = Math.sin(ang)*r;
+                        if(ring==0) { x=tx; y=ty; z=(Math.random()-0.5); c.setHex(0x00ffff); }
+                        if(ring==1) { x=tx; z=ty; y=(Math.random()-0.5); c.setHex(0xff00ff); }
+                        if(ring==2) { y=tx; z=ty; x=(Math.random()-0.5); c.setHex(0x00ff00); }
+                    }
+
+                } else if (type === 'saturn') {
+                    if (i < PARTICLE_COUNT * 0.3) {
+                        // Planet
+                        const r = 3;
+                        const theta = Math.random()*Math.PI*2;
+                        const phi = Math.acos(2*Math.random()-1);
+                        x=r*Math.sin(phi)*Math.cos(theta); y=r*Math.sin(phi)*Math.sin(theta); z=r*Math.cos(phi);
+                        c.setHex(0xffddaa);
+                    } else {
+                        // Rings
+                        const r = 4 + Math.random() * 5;
+                        const ang = Math.random() * Math.PI * 2;
+                        x = Math.cos(ang)*r; z = Math.sin(ang)*r;
+                        y = (Math.random()-0.5)*0.2;
+                        // Tilt
+                        let ty = y*Math.cos(0.5) - z*Math.sin(0.5);
+                        let tz = y*Math.sin(0.5) + z*Math.cos(0.5);
+                        y=ty; z=tz;
+                        c.setHex(0xaaccff);
+                    }
+
+                } else if (type === 'helix') {
+                    const t = (i/PARTICLE_COUNT) * Math.PI * 10;
+                    const r = 3;
+                    const h = (i/PARTICLE_COUNT) * 16 - 8;
+                    const strand = i % 2 === 0 ? 0 : Math.PI;
+                    x = Math.cos(t + strand) * r;
+                    z = Math.sin(t + strand) * r;
+                    y = h;
+                    c.setHSL(i/PARTICLE_COUNT, 1.0, 0.5);
+
+                } else if (type === 'hypercube') {
+                    // A cube inside a cube
+                    const s1 = 3; const s2 = 6;
+                    const which = i % 2;
+                    const s = which ? s1 : s2;
+                    x = (Math.random()-0.5)*s*2;
+                    y = (Math.random()-0.5)*s*2;
+                    z = (Math.random()-0.5)*s*2;
+                    
+                    // Snap to edges mostly
+                    if(Math.random()>0.8) {
+                       // Interior volume
+                    } else {
+                        // Edges
+                        const axis = Math.floor(Math.random()*3);
+                        if(axis===0) x = Math.sign(x)*s;
+                        if(axis===1) y = Math.sign(y)*s;
+                        if(axis===2) z = Math.sign(z)*s;
+                    }
+                    c.setHex(which ? 0xff0055 : 0x0055ff);
+
+                } else if (type === 'vortex') {
+                    const t = (i/PARTICLE_COUNT) * Math.PI * 20;
+                    const r = (i/PARTICLE_COUNT) * 8;
+                    x = Math.cos(t)*r; z = Math.sin(t)*r; 
+                    y = (i/PARTICLE_COUNT)*10 - 8;
+                    c.setHex(0x00ff88);
+
+                } else if (type === 'sphere') {
+                    const r = 6;
+                    const theta = Math.random()*Math.PI*2;
+                    const phi = Math.acos(2*Math.random()-1);
+                    x=r*Math.sin(phi)*Math.cos(theta); y=r*Math.sin(phi)*Math.sin(theta); z=r*Math.cos(phi);
+                    c.setHSL(0.1, 1.0, 0.5);
+
+                } else if (type === 'bigbang') {
+                    // Explosion outward
+                    const r = Math.random() * 20;
+                    const theta = Math.random()*Math.PI*2;
+                    const phi = Math.acos(2*Math.random()-1);
+                    x=r*Math.sin(phi)*Math.cos(theta); y=r*Math.sin(phi)*Math.sin(theta); z=r*Math.cos(phi);
+                    c.setHSL(Math.random(), 1.0, 0.8);
+                }
+
+                pos[i3] = x; pos[i3+1] = y; pos[i3+2] = z;
+                originalColors[i3] = c.r; originalColors[i3+1] = c.g; originalColors[i3+2] = c.b;
+            }
+
+            // Update UI highlight
+            document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${type}`).classList.add('active');
+        }
+
+        // --- ANIMATION ---
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            if(!mainSystem) return;
+
+            const positions = mainSystem.geometry.attributes.position.array;
+            const colors = mainSystem.geometry.attributes.color.array;
+            
+            // Physics Factors
+            const pinch = handState.pinch;
+            // If hand is active, stop auto rotation
+            if(handState.active) controls.autoRotate = false;
+            else controls.autoRotate = true;
+
+            controls.update(); // Update orbit controls (damping/autorotate)
+
+            // Override Rotation with Hand Tracking
+            if (handState.active) {
+                // Smooth interpolation for rotation
+                const targetRotX = handState.y * 2; // Hand Y controls Rotate X
+                const targetRotY = handState.x * 2; // Hand X controls Rotate Y
+                mainSystem.rotation.x += (targetRotX - mainSystem.rotation.x) * 0.1;
+                mainSystem.rotation.y += (targetRotY - mainSystem.rotation.y) * 0.1;
+            } else {
+                // Gentle drift if no hand
+                mainSystem.rotation.y += 0.001; 
+            }
+
+            // PARTICLE UPDATE LOOP
+            for(let i=0; i<PARTICLE_COUNT; i++) {
+                const i3 = i*3;
+                let tx = targetPositions[i3];
+                let ty = targetPositions[i3+1];
+                let tz = targetPositions[i3+2];
+
+                // 1. PINCH EFFECT (Black Hole)
+                if(pinch > 0.1) {
+                    tx *= (1 - pinch);
+                    ty *= (1 - pinch);
+                    tz *= (1 - pinch);
+                }
+
+                // 2. NOISE / DRIFT (Brownian Motion for aliveness)
+                tx += Math.sin(time + i)*0.1;
+                ty += Math.cos(time + i*0.5)*0.1;
+
+                // 3. INTERPOLATION (Move current pos to target pos)
+                // Speed depends on how far they are (elastic snap)
+                positions[i3] += (tx - positions[i3]) * 0.08;
+                positions[i3+1] += (ty - positions[i3+1]) * 0.08;
+                positions[i3+2] += (tz - positions[i3+2]) * 0.08;
+
+                // 4. COLOR SHIFT
+                let r = originalColors[i3];
+                let g = originalColors[i3+1];
+                let b = originalColors[i3+2];
+
+                if(pinch > 0.5) {
+                    // Turn red/white near singularity
+                    r = 1.0; g = 1.0 - pinch; b = 1.0 - pinch; 
+                }
+
+                colors[i3] = r; colors[i3+1] = g; colors[i3+2] = b;
+            }
+
+            mainSystem.geometry.attributes.position.needsUpdate = true;
+            mainSystem.geometry.attributes.color.needsUpdate = true;
+
+            // Render
+            composer.render();
+        }
+
+        // --- COMPUTER VISION ---
+        async function initComputerVision() {
+            try {
+                const video = document.getElementById('input_video');
+                const status = document.getElementById('status');
+
+                if(!navigator.mediaDevices?.getUserMedia) {
+                    status.innerText = "CAMERA UNAVAILABLE (USE MOUSE)";
+                    return;
+                }
+
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+                const landmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user", width: 640, height: 480 } 
+                });
+                video.srcObject = stream;
+                
+                video.addEventListener("loadeddata", () => {
+                    status.innerText = "CAMERA ACTIVE: TRACKING HAND";
+                    status.style.color = "#00ff00";
+                    detectHands(landmarker, video);
+                });
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = "AI ERROR (USING MOUSE)";
+            }
+        }
+
+        function detectHands(landmarker, video) {
+            const status = document.getElementById('status');
+            const now = performance.now();
+            const results = landmarker.detectForVideo(video, now);
+
+            if(results.landmarks.length > 0) {
+                handState.active = true;
+                const hand = results.landmarks[0]; // 21 landmarks
+
+                // Calc Center of palm (roughly)
+                const palmBase = hand[0];
+                const middleFinger = hand[9];
+                
+                // Position logic (mapped to -1 to 1)
+                const x = 1.0 - middleFinger.x; // Flip horizontally
+                const y = middleFinger.y;
+
+                // Thresholds to avoid jitter at center
+                handState.x = (x - 0.5) * 4; 
+                handState.y = (y - 0.5) * 4;
+
+                // Pinch Logic (Thumb Tip vs Index Tip)
+                const thumb = hand[4];
+                const index = hand[8];
+                const dist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                
+                // Normalize pinch (0.05 is closed, 0.2 is open roughly)
+                if(dist < 0.06) {
+                    handState.pinch = Math.min(handState.pinch + 0.1, 1.0); // Collapse
+                    status.innerText = "⚠ SINGULARITY DETECTED";
+                    status.style.color = "red";
+                } else {
+                    handState.pinch = Math.max(handState.pinch - 0.1, 0.0); // Expand
+                    status.innerText = "HAND DETECTED";
+                    status.style.color = "#00ff00";
+                }
+
+            } else {
+                handState.active = false;
+                handState.pinch = Math.max(handState.pinch - 0.05, 0);
+                status.innerText = "SCANNING SPACE...";
+                status.style.color = "#00ffff";
+            }
+
+            requestAnimationFrame(() => detectHands(landmarker, video));
+        }
+
+        // --- GLOBAL EXPORTS ---
+        window.setShape = generateShape;
+        window.toggleManual = function() {
+            const el = document.getElementById('manual-overlay');
+            el.classList.toggle('visible');
+        };
+        window.onWindowResize = function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        // Boot
+        init();
+    </script>
+</body>
+</html>
